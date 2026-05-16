@@ -4,10 +4,15 @@ const ORARIO_CONTRATTUALE_MIN = 432; // 7h 12min
 const SOGLIA_PAUSA_MIN        = 480; // 8h
 const DEDUZIONE_PAUSA_MIN     = 30;
 
+// Arrotonda l'entrata al quarto d'ora intero successivo
+function arrotondaEntrataQuarto(ora: string): number {
+  const [h, m] = ora.split(":").map(Number);
+  return Math.ceil((h * 60 + m) / 15) * 15;
+}
+
 function diffMinuti(entrata: string, uscita: string): number {
-  const [hE, mE] = entrata.split(":").map(Number);
   const [hU, mU] = uscita.split(":").map(Number);
-  return (hU * 60 + mU) - (hE * 60 + mE);
+  return (hU * 60 + mU) - arrotondaEntrataQuarto(entrata);
 }
 
 export function calcolaGiorno(fasce: Fascia[]): CalcoloGiorno {

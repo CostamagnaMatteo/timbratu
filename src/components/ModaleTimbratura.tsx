@@ -23,9 +23,15 @@ function fasciaVuota(): Fascia {
   return { entrata: "", uscita: "" };
 }
 
+function arrotondaQuarto(ora: string): string {
+  const [h, m] = ora.split(":").map(Number);
+  const tot = Math.ceil((h * 60 + m) / 15) * 15;
+  return `${String(Math.floor(tot / 60)).padStart(2, "0")}:${String(tot % 60).padStart(2, "0")}`;
+}
+
 function durataFascia(f: Fascia): number | null {
   if (f.entrata.length !== 5 || f.uscita.length !== 5) return null;
-  const [hE, mE] = f.entrata.split(":").map(Number);
+  const [hE, mE] = arrotondaQuarto(f.entrata).split(":").map(Number);
   const [hU, mU] = f.uscita.split(":").map(Number);
   const min = (hU * 60 + mU) - (hE * 60 + mE);
   return min > 0 ? min : null;
@@ -155,9 +161,17 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
             <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Fasce orarie</label>
             {fasce.map((f, i) => {
               const durata = durataFascia(f);
+              const entrataArr = f.entrata.length === 5 ? arrotondaQuarto(f.entrata) : null;
+              const entrataArrotondata = entrataArr && entrataArr !== f.entrata;
               return (
-                <div key={i} className="flex items-center gap-2">
-                  <InputOra value={f.entrata} onChange={(v) => aggiorniFascia(i, "entrata", v)} />
+                <div key={i} className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-center">
+                    <InputOra value={f.entrata} onChange={(v) => aggiorniFascia(i, "entrata", v)} />
+                    {entrataArrotondata && (
+                      <span className="text-[10px] text-orange-500 font-mono mt-0.5">→ {entrataArr}</span>
+                    )}
+                  </div>
                   <span className="text-gray-400 text-sm">→</span>
                   <InputOra value={f.uscita} onChange={(v) => aggiorniFascia(i, "uscita", v)} />
                   <span className="w-20 text-xs font-mono text-right">
@@ -175,6 +189,7 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
                       ×
                     </button>
                   )}
+                </div>
                 </div>
               );
             })}
