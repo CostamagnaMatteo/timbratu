@@ -27,9 +27,12 @@ export function MesePageClient({ anno, mese }: Props) {
   const carica = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const dati = await getTimbrattureMese(user.uid, anno, mese);
-    setTimbrature(dati);
-    setLoading(false);
+    try {
+      const dati = await getTimbrattureMese(user.uid, anno, mese);
+      setTimbrature(dati);
+    } finally {
+      setLoading(false);
+    }
   }, [user, anno, mese]);
 
   useEffect(() => { carica(); }, [carica]);
