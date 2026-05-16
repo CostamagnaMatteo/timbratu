@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Timbratura, TipoGiornata, Fascia } from "@/types/timbratura";
+import { formatOre } from "@/lib/calcolo-ore";
 
 interface Props {
   data:        string;
@@ -20,6 +21,49 @@ const TIPI: { valore: TipoGiornata; label: string }[] = [
 
 function fasciaVuota(): Fascia {
   return { entrata: "", uscita: "" };
+}
+
+function durataFascia(f: Fascia): number | null {
+  if (f.entrata.length !== 5 || f.uscita.length !== 5) return null;
+  const [hE, mE] = f.entrata.split(":").map(Number);
+  const [hU, mU] = f.uscita.split(":").map(Number);
+  const min = (hU * 60 + mU) - (hE * 60 + mE);
+  return min > 0 ? min : null;
+}
+
+function InputOra({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let v = e.target.value.replace(/[^\d:]/g, "");
+
+    // auto-inserisce ":" dopo le prime 2 cifre
+    if (/^\d{3}/.test(v.replace(":", ""))) {
+      const digits = v.replace(":", "");
+      v = digits.slice(0, 2) + ":" + digits.slice(2, 4);
+    }
+
+    // limita a 5 caratteri (HH:MM)
+    if (v.length > 5) return;
+
+    // valida ore e minuti se la stringa è completa
+    if (v.length === 5) {
+      const [hh, mm] = v.split(":").map(Number);
+      if (hh > 23 || mm > 59) return;
+    }
+
+    onChange(v);
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      placeholder="HH:MM"
+      value={value}
+      onChange={handleChange}
+      maxLength={5}
+      className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono w-24 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+    />
+  );
 }
 
 export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
@@ -109,32 +153,31 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
         {tipo === "lavoro" && (
           <div className="flex flex-col gap-2">
             <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Fasce orarie</label>
-            {fasce.map((f, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  type="time"
-                  value={f.entrata}
-                  onChange={(e) => aggiorniFascia(i, "entrata", e.target.value)}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="text-gray-400 text-sm">→</span>
-                <input
-                  type="time"
-                  value={f.uscita}
-                  onChange={(e) => aggiorniFascia(i, "uscita", e.target.value)}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {fasce.length > 1 && (
-                  <button
-                    onClick={() => rimuoviFascia(i)}
-                    className="text-gray-300 hover:text-red-400 transition text-lg leading-none"
-                    aria-label="Rimuovi fascia"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
+            {fasce.map((f, i) => {
+              const durata = durataFascia(f);
+              return (
+                <div key={i} className="flex items-center gap-2">
+                  <InputOra value={f.entrata} onChange={(v) => aggiorniFascia(i, "entrata", v)} />
+                  <span className="text-gray-400 text-sm">→</span>
+                  <InputOra value={f.uscita} onChange={(v) => aggiorniFascia(i, "uscita", v)} />
+                  <span className="w-20 text-xs font-mono text-right">
+                    {durata !== null
+                      ? <span className="text-blue-600 font-medium">{formatOre(durata)}</span>
+                      : <span className="text-gray-300">—</span>
+                    }
+                  </span>
+                  {fasce.length > 1 && (
+                    <button
+                      onClick={() => rimuoviFascia(i)}
+                      className="text-gray-300 hover:text-red-400 transition text-lg leading-none"
+                      aria-label="Rimuovi fascia"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              );
+            })}
             <button
               onClick={aggiungiFascia}
               className="text-xs text-blue-600 hover:text-blue-800 font-medium self-start transition"
