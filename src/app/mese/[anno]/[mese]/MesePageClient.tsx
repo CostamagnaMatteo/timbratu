@@ -5,7 +5,8 @@ import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Header } from "@/components/Header";
 import { TabellaMessile } from "@/components/TabellaMessile";
-import { getTimbrattureMese, deleteTimbratura } from "@/lib/firestore";
+import { ModaleTimbratura } from "@/components/ModaleTimbratura";
+import { getTimbrattureMese, setTimbratura, deleteTimbratura } from "@/lib/firestore";
 import { calcolaMese } from "@/lib/calcolo-ore";
 import { giorniDelMese } from "@/lib/date-utils";
 import { Timbratura } from "@/types/timbratura";
@@ -19,6 +20,7 @@ export function MesePageClient({ anno, mese }: Props) {
   const { user } = useAuth();
   const [timbrature, setTimbrature] = useState<Record<string, Timbratura>>({});
   const [loading, setLoading]       = useState(true);
+  const [modaleData, setModaleData] = useState<string | null>(null);
 
   const giorni = giorniDelMese(anno, mese);
 
@@ -33,8 +35,14 @@ export function MesePageClient({ anno, mese }: Props) {
   useEffect(() => { carica(); }, [carica]);
 
   const handleEdit = (data: string) => {
-    // il modale di inserimento/modifica sarà implementato nel prossimo step
-    alert(`Modifica: ${data}`);
+    setModaleData(data);
+  };
+
+  const handleSalva = async (data: string, t: Timbratura) => {
+    if (!user) return;
+    await setTimbratura(user.uid, data, t);
+    setTimbrature((prev) => ({ ...prev, [data]: t }));
+    setModaleData(null);
   };
 
   const handleDelete = async (data: string) => {
@@ -51,6 +59,14 @@ export function MesePageClient({ anno, mese }: Props) {
 
   return (
     <AuthGuard>
+      {modaleData && (
+        <ModaleTimbratura
+          data={modaleData}
+          iniziale={timbrature[modaleData] ?? null}
+          onSalva={(t) => handleSalva(modaleData, t)}
+          onChiudi={() => setModaleData(null)}
+        />
+      )}
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <Header anno={anno} mese={mese} saldoTotaleMin={saldoTotaleMin} />
 

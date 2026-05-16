@@ -2,15 +2,38 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function LoginPage() {
-  const { user, loading, login } = useAuth();
+  const { user, loading, login, loginWithEmail, registerWithEmail } = useAuth();
   const router = useRouter();
+
+  const [modalita, setModalita] = useState<"login" | "registra">("login");
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [errore, setErrore]     = useState<string | null>(null);
+  const [invio, setInvio]       = useState(false);
 
   useEffect(() => {
     if (!loading && user) router.replace("/");
   }, [user, loading, router]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErrore(null);
+    setInvio(true);
+    try {
+      if (modalita === "login") {
+        await loginWithEmail(email, password);
+      } else {
+        await registerWithEmail(email, password);
+      }
+    } catch (err: unknown) {
+      setErrore(messaggioErrore(err));
+    } finally {
+      setInvio(false);
+    }
+  }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -19,6 +42,58 @@ export default function LoginPage() {
         <p className="text-sm text-gray-500 text-center">
           Gestione timbrature per dipendenti pubblici
         </p>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3 w-full">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full px-4 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            className="w-full px-4 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          {errore && (
+            <p className="text-xs text-red-500 text-center">{errore}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={invio}
+            className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
+          >
+            {invio
+              ? "..."
+              : modalita === "login"
+              ? "Accedi"
+              : "Registrati"}
+          </button>
+        </form>
+
+        <button
+          onClick={() => { setModalita(modalita === "login" ? "registra" : "login"); setErrore(null); }}
+          className="text-xs text-gray-500 hover:text-gray-700 transition"
+        >
+          {modalita === "login"
+            ? "Non hai un account? Registrati"
+            : "Hai già un account? Accedi"}
+        </button>
+
+        <div className="flex items-center gap-3 w-full">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400">oppure</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
         <button
           onClick={login}
           className="flex items-center gap-3 px-5 py-3 rounded-lg border border-gray-300 hover:bg-gray-50 transition text-sm font-medium text-gray-700 w-full justify-center"
@@ -46,4 +121,20 @@ export default function LoginPage() {
       </div>
     </main>
   );
+}
+
+function messaggioErrore(err: unknown): string {
+  if (err instanceof Error) {
+    const code = (err as { code?: string }).code ?? "";
+    const map: Record<string, string> = {
+      "auth/invalid-credential":    "Email o password non corretti.",
+      "auth/user-not-found":        "Nessun account trovato con questa email.",
+      "auth/wrong-password":        "Password non corretta.",
+      "auth/email-already-in-use":  "Email già in uso.",
+      "auth/weak-password":         "La password deve essere di almeno 6 caratteri.",
+      "auth/invalid-email":         "Indirizzo email non valido.",
+    };
+    return map[code] ?? "Errore durante l'accesso. Riprova.";
+  }
+  return "Errore sconosciuto.";
 }
