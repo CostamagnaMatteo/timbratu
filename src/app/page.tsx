@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
@@ -110,7 +111,7 @@ function HomeContent() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <span className="text-lg font-semibold text-gray-800">Timbratu</span>
+          <Link href="/" className="text-lg font-semibold text-gray-800">Timbratu</Link>
           <div className="flex items-center gap-3">
             {user?.photoURL && (
               // eslint-disable-next-line @next/next/no-img-element
