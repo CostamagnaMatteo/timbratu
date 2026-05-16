@@ -1,6 +1,6 @@
 import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Timbratura } from "@/types/timbratura";
+import { Timbratura, AggregazioneMese } from "@/types/timbratura";
 
 function timbraturaPath(uid: string, data: string) {
   return doc(db, "users", uid, "timbrature", data);
@@ -51,4 +51,33 @@ export async function setTimbratura(uid: string, data: string, t: Timbratura): P
 
 export async function deleteTimbratura(uid: string, data: string): Promise<void> {
   await deleteDoc(timbraturaPath(uid, data));
+}
+
+function aggregazionePath(uid: string, anno: number, mese: number) {
+  return doc(db, "users", uid, "aggregazioni", `${anno}-${String(mese).padStart(2, "0")}`);
+}
+
+export async function getAggregazioneMese(
+  uid: string,
+  anno: number,
+  mese: number
+): Promise<AggregazioneMese | null> {
+  const snap = await getDoc(aggregazionePath(uid, anno, mese));
+  return snap.exists() ? (snap.data() as AggregazioneMese) : null;
+}
+
+export async function setAggregazioneMese(
+  uid: string,
+  anno: number,
+  mese: number,
+  data: AggregazioneMese
+): Promise<void> {
+  await setDoc(aggregazionePath(uid, anno, mese), data);
+}
+
+export async function getTutteLeAggregazioni(uid: string): Promise<AggregazioneMese[]> {
+  const snap = await getDocs(collection(db, "users", uid, "aggregazioni"));
+  const result: AggregazioneMese[] = [];
+  snap.forEach((d) => result.push(d.data() as AggregazioneMese));
+  return result;
 }

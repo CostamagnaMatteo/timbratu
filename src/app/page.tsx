@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
-import { getTimbrattureMese, getTutteLeTimbrature } from "@/lib/firestore";
+import { getTimbrattureMese, getTutteLeAggregazioni } from "@/lib/firestore";
 import { calcolaMese, calcolaGiorno, formatMinuti, formatOre } from "@/lib/calcolo-ore";
 import { giorniDelMese, nomeMese, isWeekend } from "@/lib/date-utils";
 import { Timbratura, TipoGiornata } from "@/types/timbratura";
@@ -50,19 +50,19 @@ function HomeContent() {
   const oggi    = now.toISOString().slice(0, 10);
 
   const [timbrature, setTimbrature]       = useState<Record<string, Timbratura>>({});
-  const [tutteTimbrature, setTutte]       = useState<Record<string, Timbratura>>({});
+  const [saldoComplessivoMin, setSaldoComplessivo] = useState(0);
   const [loading, setLoading]             = useState(true);
 
   const carica = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const [datiMese, datiTutti] = await Promise.all([
+      const [datiMese, aggregazioni] = await Promise.all([
         getTimbrattureMese(user.uid, anno, mese),
-        getTutteLeTimbrature(user.uid),
+        getTutteLeAggregazioni(user.uid),
       ]);
       setTimbrature(datiMese);
-      setTutte(datiTutti);
+      setSaldoComplessivo(aggregazioni.reduce((acc, a) => acc + a.saldoTotaleMin, 0));
     } finally {
       setLoading(false);
     }
@@ -79,7 +79,6 @@ function HomeContent() {
   const giorniRimanenti = giorni.filter((g) => g >= oggi && !isWeekend(g)).length;
 
   const { saldoTotaleMin, giorniLavorativi } = calcolaMese(timbrature);
-  const { saldoTotaleMin: saldoComplessivoMin } = calcolaMese(tutteTimbrature);
 
   // Ore lavorate oggi
   const oggiTimbratura = timbrature[oggi];

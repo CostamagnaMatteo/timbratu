@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import { TabellaMessile } from "@/components/TabellaMessile";
 import { ModaleTimbratura } from "@/components/ModaleTimbratura";
 import { getTimbrattureMese, setTimbratura, deleteTimbratura } from "@/lib/firestore";
+import { aggrega } from "@/lib/aggregazione";
 import { calcolaMese } from "@/lib/calcolo-ore";
 import { giorniDelMese } from "@/lib/date-utils";
 import { Timbratura } from "@/types/timbratura";
@@ -41,11 +42,14 @@ export function MesePageClient({ anno, mese }: Props) {
     setModaleData(data);
   };
 
+  const oggi = new Date().toISOString().slice(0, 10);
+
   const handleSalva = async (data: string, t: Timbratura) => {
     if (!user) return;
     await setTimbratura(user.uid, data, t);
     setTimbrature((prev) => ({ ...prev, [data]: t }));
     setModaleData(null);
+    aggrega(user.uid, anno, mese, oggi);
   };
 
   const handleDelete = async (data: string) => {
@@ -56,6 +60,7 @@ export function MesePageClient({ anno, mese }: Props) {
       delete next[data];
       return next;
     });
+    aggrega(user.uid, anno, mese, oggi);
   };
 
   const { saldoTotaleMin } = calcolaMese(timbrature);

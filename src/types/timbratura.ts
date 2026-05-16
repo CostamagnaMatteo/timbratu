@@ -22,3 +22,9 @@ export interface CalcoloMese {
   saldoTotaleMin:   number;
   giorniLavorativi: number;
 }
+
+export interface AggregazioneMese {
+  saldoTotaleMin:   number;
+  giorniLavorativi: number;
+  aggregatoIl:      string; // YYYY-MM-DD
+}
