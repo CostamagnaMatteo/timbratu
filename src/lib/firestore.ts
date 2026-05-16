@@ -27,6 +27,19 @@ export async function getTimbrattureMese(
   return result;
 }
 
+export async function getTutteLeTimbrature(
+  uid: string
+): Promise<Record<string, Timbratura>> {
+  const q = query(
+    collection(db, "users", uid, "timbrature"),
+    orderBy("__name__", "asc")
+  );
+  const snap = await getDocs(q);
+  const result: Record<string, Timbratura> = {};
+  snap.forEach((d) => { result[d.id] = d.data() as Timbratura; });
+  return result;
+}
+
 export async function getTimbratura(uid: string, data: string): Promise<Timbratura | null> {
   const snap = await getDoc(timbraturaPath(uid, data));
   return snap.exists() ? (snap.data() as Timbratura) : null;

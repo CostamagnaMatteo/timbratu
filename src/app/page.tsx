@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
-import { getTimbrattureMese } from "@/lib/firestore";
+import { getTimbrattureMese, getTutteLeTimbrature } from "@/lib/firestore";
 import { calcolaMese, calcolaGiorno, formatMinuti, formatOre } from "@/lib/calcolo-ore";
 import { giorniDelMese, nomeMese, isWeekend } from "@/lib/date-utils";
 import { Timbratura, TipoGiornata } from "@/types/timbratura";
@@ -49,15 +49,20 @@ function HomeContent() {
   const mese    = now.getMonth() + 1;
   const oggi    = now.toISOString().slice(0, 10);
 
-  const [timbrature, setTimbrature] = useState<Record<string, Timbratura>>({});
-  const [loading, setLoading]       = useState(true);
+  const [timbrature, setTimbrature]       = useState<Record<string, Timbratura>>({});
+  const [tutteTimbrature, setTutte]       = useState<Record<string, Timbratura>>({});
+  const [loading, setLoading]             = useState(true);
 
   const carica = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const dati = await getTimbrattureMese(user.uid, anno, mese);
-      setTimbrature(dati);
+      const [datiMese, datiTutti] = await Promise.all([
+        getTimbrattureMese(user.uid, anno, mese),
+        getTutteLeTimbrature(user.uid),
+      ]);
+      setTimbrature(datiMese);
+      setTutte(datiTutti);
     } finally {
       setLoading(false);
     }
@@ -74,6 +79,7 @@ function HomeContent() {
   const giorniRimanenti = giorni.filter((g) => g >= oggi && !isWeekend(g)).length;
 
   const { saldoTotaleMin, giorniLavorativi } = calcolaMese(timbrature);
+  const { saldoTotaleMin: saldoComplessivoMin } = calcolaMese(tutteTimbrature);
 
   // Ore lavorate oggi
   const oggiTimbratura = timbrature[oggi];
@@ -151,6 +157,15 @@ function HomeContent() {
           <div className="text-center py-20 text-gray-400 text-sm">Caricamento...</div>
         ) : (
           <>
+            {/* Saldo complessivo */}
+            <div className="mb-6">
+              <StatCard
+                label="Saldo complessivo (tutti i mesi)"
+                value={formatMinuti(saldoComplessivoMin)}
+                accent={saldoComplessivoMin >= 0 ? "green" : "red"}
+              />
+            </div>
+
             {/* Card principali */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
               <StatCard
