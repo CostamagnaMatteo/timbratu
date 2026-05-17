@@ -60,6 +60,17 @@ function etichettaGiorno(data: string): string {
   return `${nomeGiorno(data).toLowerCase()} ${data.slice(8)}`;
 }
 
+// Formato compatto "h m" (es. +1h 18m) usato nella UI — distinto da formatMinuti che usa "min"
+function formatM(min: number): string {
+  const segno = min >= 0 ? "+" : "-";
+  const abs   = Math.abs(min);
+  const ore   = Math.floor(abs / 60);
+  const m     = abs % 60;
+  return ore > 0
+    ? `${segno}${ore}h ${String(m).padStart(2, "0")}m`
+    : `${segno}${m}m`;
+}
+
 // ── MonthPicker ──────────────────────────────────────────────────────────
 
 function MonthPicker({
@@ -77,11 +88,11 @@ function MonthPicker({
   const label = `${nomeMese(mese).toLowerCase()}${anno !== annoCorrente ? ` ${anno}` : ""}`;
 
   return (
-    <div className="flex items-center gap-2 w-full">
+    <div className="flex items-center gap-2 w-full border-2 border-zinc-800 rounded-xl px-2 py-1.5 shadow-[2px_2px_0_0_rgba(31,29,26,0.12)]">
       <button
         onClick={() => onChange(annoPrev, mesePrev)}
         aria-label="Mese precedente"
-        className="w-10 h-10 shrink-0 flex items-center justify-center rounded-xl border border-zinc-200 text-zinc-500 hover:bg-zinc-100 transition text-xl leading-none"
+        className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-zinc-700 text-zinc-700 hover:bg-[#ebe2cc] transition text-2xl leading-none"
       >
         ‹
       </button>
@@ -91,7 +102,7 @@ function MonthPicker({
       <button
         onClick={() => onChange(annoNext, meseNext)}
         aria-label="Mese successivo"
-        className="w-10 h-10 shrink-0 flex items-center justify-center rounded-xl border border-zinc-200 text-zinc-500 hover:bg-zinc-100 transition text-xl leading-none"
+        className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-zinc-700 text-zinc-700 hover:bg-[#ebe2cc] transition text-2xl leading-none"
       >
         ›
       </button>
@@ -194,7 +205,7 @@ function DayRow({
   return (
     <button
       onClick={onClick}
-      className="grid grid-cols-[60px_1fr_auto] items-center gap-2 py-2.5 border-b border-zinc-100 last:border-0 text-left w-full hover:bg-zinc-50 rounded-lg px-1 transition"
+      className="grid grid-cols-[60px_1fr_auto] items-center gap-2 py-2.5 border-b border-dotted border-zinc-300 last:border-0 text-left w-full hover:bg-[#f4ead2] rounded-lg px-1 transition"
     >
       <span className="text-[13px] font-medium text-zinc-700 tabular-nums">
         {etichettaGiorno(data)}
@@ -372,15 +383,9 @@ function HomeContent() {
                 </span>
               </div>
 
-              <span
-                className={`text-xs px-3 py-1 rounded-full font-medium tabular-nums ${
-                  saldoTotaleMin >= 0
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-red-50 text-red-600"
-                }`}
-              >
+              <span className="text-xs px-3 py-1 rounded-full font-medium tabular-nums bg-[#f4ead2] text-zinc-700 border border-[#ebe2cc]">
                 {isCurrentMonth ? "questo mese" : nomeMese(mese).toLowerCase()}{" "}
-                <span className="font-bold">
+                <span className={`font-bold ${saldoTotaleMin >= 0 ? "text-emerald-700" : "text-red-600"}`}>
                   {mesePill.segno}{mesePill.ore}h {String(mesePill.minuti).padStart(2, "0")}m
                 </span>
               </span>
@@ -411,7 +416,7 @@ function HomeContent() {
                 }
                 sub={
                   saldoOggiMin !== null
-                    ? `${formatMinuti(saldoOggiMin)} vs contratto`
+                    ? formatM(saldoOggiMin)
                     : !isCurrentMonth
                     ? "altro mese"
                     : undefined
@@ -438,7 +443,7 @@ function HomeContent() {
                 label="Proiezione"
                 value={
                   saldoProiettatoMin !== null
-                    ? formatMinuti(saldoProiettatoMin)
+                    ? formatM(saldoProiettatoMin)
                     : "—"
                 }
                 sub={
@@ -485,10 +490,8 @@ function HomeContent() {
 
         {/* ── Ledger — ultimi giorni ──────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-[#ebe2cc] px-3 pb-1 pt-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">
-              Ultimi giorni
-            </span>
+          <div className="flex items-baseline justify-between mb-1">
+            <span className="text-base font-semibold text-zinc-800">ultimi giorni</span>
             <Link
               href={`/mese/${anno}/${String(mese).padStart(2, "0")}`}
               className="text-xs text-zinc-500 hover:text-zinc-800 transition"
@@ -496,6 +499,7 @@ function HomeContent() {
               vai al mese →
             </Link>
           </div>
+          <div className="border-t border-dashed border-zinc-400 mb-1" />
 
           {loading ? (
             <LedgerSkeleton />
