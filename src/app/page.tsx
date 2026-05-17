@@ -2,58 +2,236 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
-import { getTimbrattureMese, getTutteLeAggregazioni } from "@/lib/firestore";
-import { calcolaMese, calcolaGiorno, formatMinuti, formatOre } from "@/lib/calcolo-ore";
-import { giorniDelMese, nomeMese, isWeekend } from "@/lib/date-utils";
+import { ModaleTimbratura } from "@/components/ModaleTimbratura";
+import {
+  getTimbrattureMese,
+  getTutteLeAggregazioni,
+  setTimbratura,
+} from "@/lib/firestore";
+import { aggrega } from "@/lib/aggregazione";
+import { calcolaMese, calcolaGiorno, formatMinuti } from "@/lib/calcolo-ore";
+import {
+  giorniDelMese,
+  nomeMese,
+  isWeekend,
+  nomeGiorno,
+  mesePrecedente,
+  meseSuccessivo,
+} from "@/lib/date-utils";
 import { Timbratura, TipoGiornata } from "@/types/timbratura";
 
-const ORARIO_CONTRATTUALE_MIN = 432;
+// ── costanti ─────────────────────────────────────────────────────────────
+
+const ORARIO_CONTRATTUALE_MIN = 432; // 7h 12min
+
+const TIPO_LABELS: Record<TipoGiornata, string> = {
+  lavoro:   "Lavoro",
+  ferie:    "Ferie",
+  permesso: "Permesso",
+  malattia: "Malattia",
+  festivo:  "Festivo",
+};
+
+// ── helpers ───────────────────────────────────────────────────────────────
+
+function oggiLocale(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+interface BilancioParts {
+  segno: "+" | "-";
+  ore: number;
+  minuti: number;
+}
+
+function splitBilancio(min: number): BilancioParts {
+  const abs = Math.abs(min);
+  return {
+    segno: min >= 0 ? "+" : "-",
+    ore: Math.floor(abs / 60),
+    minuti: abs % 60,
+  };
+}
+
+function etichettaGiorno(data: string): string {
+  return `${nomeGiorno(data).toLowerCase()} ${data.slice(8)}`;
+}
+
+// ── MonthPicker ──────────────────────────────────────────────────────────
+
+function MonthPicker({
+  anno,
+  mese,
+  onChange,
+}: {
+  anno: number;
+  mese: number;
+  onChange: (a: number, m: number) => void;
+}) {
+  const { anno: annoPrev, mese: mesePrev } = mesePrecedente(anno, mese);
+  const { anno: annoNext, mese: meseNext } = meseSuccessivo(anno, mese);
+  const annoCorrente = new Date().getFullYear();
+  const label = `${nomeMese(mese).toLowerCase()}${anno !== annoCorrente ? ` ${anno}` : ""}`;
+
+  return (
+    <div className="flex items-center gap-2 w-full">
+      <button
+        onClick={() => onChange(annoPrev, mesePrev)}
+        aria-label="Mese precedente"
+        className="w-10 h-10 shrink-0 flex items-center justify-center rounded-xl border border-zinc-200 text-zinc-500 hover:bg-zinc-100 transition text-xl leading-none"
+      >
+        ‹
+      </button>
+      <div className="flex-1 text-center">
+        <span className="text-2xl font-semibold text-zinc-900">{label}</span>
+      </div>
+      <button
+        onClick={() => onChange(annoNext, meseNext)}
+        aria-label="Mese successivo"
+        className="w-10 h-10 shrink-0 flex items-center justify-center rounded-xl border border-zinc-200 text-zinc-500 hover:bg-zinc-100 transition text-xl leading-none"
+      >
+        ›
+      </button>
+    </div>
+  );
+}
+
+// ── StatCard ──────────────────────────────────────────────────────────────
 
 function StatCard({
   label,
   value,
   sub,
-  accent,
+  color = "zinc",
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   sub?: string;
-  accent?: "green" | "red" | "blue" | "gray";
+  color?: "emerald" | "red" | "zinc" | "amber";
 }) {
-  const colors: Record<string, string> = {
-    green: "text-green-600",
-    red:   "text-red-600",
-    blue:  "text-blue-600",
-    gray:  "text-gray-600",
+  const textColor: Record<string, string> = {
+    emerald: "text-emerald-600",
+    red:     "text-red-500",
+    zinc:    "text-zinc-800",
+    amber:   "text-amber-500",
   };
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-1">
-      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</span>
-      <span className={`text-2xl font-bold ${accent ? colors[accent] : "text-gray-800"}`}>
+    <div className="bg-white rounded-xl border border-zinc-200 p-3 flex flex-col gap-0.5 min-h-[76px]">
+      <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest leading-none">
+        {label}
+      </span>
+      <span className={`text-xl font-bold tabular-nums leading-snug ${textColor[color]}`}>
         {value}
       </span>
-      {sub && <span className="text-xs text-gray-400">{sub}</span>}
+      {sub && (
+        <span className="text-[11px] text-zinc-400 leading-tight">{sub}</span>
+      )}
     </div>
   );
 }
 
+// ── Skeleton placeholders ────────────────────────────────────────────────
+
+function StatCardSkeleton() {
+  return (
+    <div className="bg-white rounded-xl border border-zinc-200 p-3 min-h-[76px] flex flex-col gap-2 animate-pulse">
+      <div className="h-2.5 w-12 bg-zinc-100 rounded" />
+      <div className="h-6 w-20 bg-zinc-100 rounded" />
+      <div className="h-2 w-16 bg-zinc-100 rounded" />
+    </div>
+  );
+}
+
+function HeroSkeleton() {
+  return (
+    <div className="flex flex-col items-center gap-3 animate-pulse">
+      <div className="h-3 w-28 bg-zinc-100 rounded-full" />
+      <div className="h-14 w-48 bg-zinc-100 rounded-2xl" />
+      <div className="h-7 w-36 bg-zinc-100 rounded-full" />
+    </div>
+  );
+}
+
+function LedgerSkeleton() {
+  return (
+    <div className="flex flex-col gap-2 pt-2 animate-pulse">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="h-8 bg-zinc-100 rounded" />
+      ))}
+    </div>
+  );
+}
+
+// ── DayRow (ledger) ──────────────────────────────────────────────────────
+
+function DayRow({
+  data,
+  timbratura,
+  onClick,
+}: {
+  data: string;
+  timbratura: Timbratura;
+  onClick: () => void;
+}) {
+  const { tipo, fasce } = timbratura;
+  const isLavoro = tipo === "lavoro" && fasce?.length;
+
+  const orario = isLavoro
+    ? `${fasce![0].entrata} → ${fasce![fasce!.length - 1].uscita}`
+    : TIPO_LABELS[tipo].toLowerCase();
+
+  const { saldo, isPositivo } = isLavoro
+    ? (() => {
+        const { saldoMin } = calcolaGiorno(fasce!);
+        return { saldo: formatMinuti(saldoMin), isPositivo: saldoMin >= 0 };
+      })()
+    : { saldo: "—", isPositivo: null };
+
+  return (
+    <button
+      onClick={onClick}
+      className="grid grid-cols-[60px_1fr_auto] items-center gap-2 py-2.5 border-b border-zinc-100 last:border-0 text-left w-full hover:bg-zinc-50 rounded-lg px-1 transition"
+    >
+      <span className="text-[13px] font-medium text-zinc-700 tabular-nums">
+        {etichettaGiorno(data)}
+      </span>
+      <span className="text-[13px] text-zinc-400 font-mono truncate">{orario}</span>
+      <span
+        className={[
+          "text-[13px] font-semibold tabular-nums text-right w-[72px] shrink-0",
+          isPositivo === null
+            ? "text-zinc-400"
+            : isPositivo
+            ? "text-emerald-600"
+            : "text-red-500",
+        ].join(" ")}
+      >
+        {saldo}
+      </span>
+    </button>
+  );
+}
+
+// ── HomeContent ───────────────────────────────────────────────────────────
+
 function HomeContent() {
   const { user, logout } = useAuth();
-  const router = useRouter();
 
-  const now     = new Date();
-  const anno    = now.getFullYear();
-  const mese    = now.getMonth() + 1;
-  const oggi    = now.toISOString().slice(0, 10);
+  const now = new Date();
+  const [anno, setAnno]   = useState(now.getFullYear());
+  const [mese, setMese]   = useState(now.getMonth() + 1);
+  const dataOggi = oggiLocale();
 
-  const [timbrature, setTimbrature]       = useState<Record<string, Timbratura>>({});
+  const [timbrature, setTimbrature]               = useState<Record<string, Timbratura>>({});
   const [saldoComplessivoMin, setSaldoComplessivo] = useState(0);
-  const [loading, setLoading]             = useState(true);
+  const [loading, setLoading]                     = useState(true);
+  const [modaleData, setModaleData]               = useState<string | null>(null);
 
-  const carica = useCallback(async () => {
+  const caricaDati = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
@@ -68,27 +246,30 @@ function HomeContent() {
     }
   }, [user, anno, mese]);
 
-  useEffect(() => { carica(); }, [carica]);
+  useEffect(() => { caricaDati(); }, [caricaDati]);
+
+  // ── calcoli ───────────────────────────────────────────────────────────
+
+  const isCurrentMonth =
+    anno === now.getFullYear() && mese === now.getMonth() + 1;
 
   const giorni = giorniDelMese(anno, mese);
-
-  // Giorni lavorativi del mese (no weekend)
   const giorniLavorativiTotali = giorni.filter((g) => !isWeekend(g)).length;
-
-  // Giorni lavorativi rimanenti da oggi in poi (incluso oggi)
-  const giorniRimanenti = giorni.filter((g) => g >= oggi && !isWeekend(g)).length;
+  const giorniRimanenti        = giorni.filter((g) => g >= dataOggi && !isWeekend(g)).length;
 
   const { saldoTotaleMin, giorniLavorativi } = calcolaMese(timbrature);
 
-  // Ore lavorate oggi
-  const oggiTimbratura = timbrature[oggi];
-  const oreLavorateOggiMin =
+  const oggiTimbratura = isCurrentMonth ? timbrature[dataOggi] : undefined;
+  const oreOggiMin =
     oggiTimbratura?.tipo === "lavoro" && oggiTimbratura.fasce?.length
       ? calcolaGiorno(oggiTimbratura.fasce).oreNetteMin
       : null;
+  const saldoOggiMin =
+    oggiTimbratura?.tipo === "lavoro" && oggiTimbratura.fasce?.length
+      ? calcolaGiorno(oggiTimbratura.fasce).saldoMin
+      : null;
 
-  // Distribuzione tipi (escluso lavoro)
-  const conteggioTipi = Object.values(timbrature).reduce(
+  const assenze = Object.values(timbrature).reduce(
     (acc, t) => {
       if (t.tipo !== "lavoro") acc[t.tipo] = (acc[t.tipo] ?? 0) + 1;
       return acc;
@@ -96,36 +277,60 @@ function HomeContent() {
     {} as Partial<Record<TipoGiornata, number>>
   );
 
-  // Proiezione saldo a fine mese
   const mediaGiornalieraMin =
-    giorniLavorativi > 0 ? saldoTotaleMin / giorniLavorativi : 0;
+    giorniLavorativi > 1 ? saldoTotaleMin / giorniLavorativi : null;
   const saldoProiettatoMin =
-    saldoTotaleMin + mediaGiornalieraMin * giorniRimanenti;
+    mediaGiornalieraMin !== null && isCurrentMonth
+      ? Math.round(saldoTotaleMin + mediaGiornalieraMin * giorniRimanenti)
+      : null;
 
-  const saldoPositivo = saldoTotaleMin >= 0;
+  const ultimiGiorni = Object.entries(timbrature)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 5);
 
-  const tipoLabels: Record<string, string> = {
-    ferie:    "Ferie",
-    permesso: "Permessi",
-    malattia: "Malattia",
-    festivo:  "Festivi",
+  const hero     = splitBilancio(saldoComplessivoMin);
+  const mesePill = splitBilancio(saldoTotaleMin);
+
+  // ── salva timbratura ──────────────────────────────────────────────────
+
+  const handleSalva = async (data: string, t: Timbratura) => {
+    if (!user) return;
+    await setTimbratura(user.uid, data, t);
+    await aggrega(
+      user.uid,
+      parseInt(data.slice(0, 4)),
+      parseInt(data.slice(5, 7)),
+      dataOggi
+    );
+    setModaleData(null);
+    caricaDati();
   };
 
+  // ── render ────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link href="/" className="text-lg font-semibold text-gray-800">Timbratu</Link>
-          <div className="flex items-center gap-3">
-            {user?.photoURL && (
+    <div className="min-h-screen bg-zinc-50">
+
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-zinc-200 px-4 py-3">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <span className="text-base font-semibold text-zinc-900 tracking-tight">Timbratuu</span>
+          <div className="flex items-center gap-2">
+            {user?.photoURL ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full" />
+              <img
+                src={user.photoURL}
+                alt=""
+                className="w-8 h-8 rounded-full border border-zinc-200"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-zinc-200 flex items-center justify-center text-xs font-semibold text-zinc-600">
+                {user?.displayName?.[0]?.toUpperCase() ?? "?"}
+              </div>
             )}
-            <span className="text-sm text-gray-700 hidden sm:block">{user?.displayName}</span>
             <button
               onClick={logout}
-              className="text-xs text-gray-400 hover:text-gray-700 transition"
+              className="text-xs text-zinc-400 hover:text-zinc-700 transition"
             >
               Esci
             </button>
@@ -133,103 +338,211 @@ function HomeContent() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
-        {/* Titolo sezione */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-800">
-              {nomeMese(mese)} {anno}
-            </h1>
-            <p className="text-sm text-gray-400 mt-0.5">Riepilogo mese corrente</p>
-          </div>
-          <button
-            onClick={() =>
-              router.push(`/mese/${anno}/${String(mese).padStart(2, "0")}`)
-            }
-            className="text-sm font-medium text-blue-600 hover:text-blue-700 transition"
-          >
-            Vai al dettaglio →
-          </button>
+      <main className="max-w-lg mx-auto px-4 pb-28 flex flex-col gap-5">
+
+        {/* ── Month picker ───────────────────────────────────────────── */}
+        <div className="pt-5">
+          <MonthPicker
+            anno={anno}
+            mese={mese}
+            onChange={(a, m) => { setAnno(a); setMese(m); }}
+          />
         </div>
 
-        {loading ? (
-          <div className="text-center py-20 text-gray-400 text-sm">Caricamento...</div>
-        ) : (
-          <>
-            {/* Saldo complessivo */}
-            <div className="mb-6">
-              <StatCard
-                label="Saldo complessivo (tutti i mesi)"
-                value={formatMinuti(saldoComplessivoMin)}
-                accent={saldoComplessivoMin >= 0 ? "green" : "red"}
-              />
-            </div>
+        {/* ── Hero saldo ─────────────────────────────────────────────── */}
+        <div className="flex flex-col items-center gap-2 py-4">
+          {loading ? (
+            <HeroSkeleton />
+          ) : (
+            <>
+              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-widest">
+                La tua banca ore
+              </span>
 
-            {/* Card principali */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
-              <StatCard
-                label="Saldo mese"
-                value={formatMinuti(saldoTotaleMin)}
-                sub={`su ${giorniLavorativi} giorni lavorati`}
-                accent={saldoPositivo ? "green" : "red"}
-              />
-              <StatCard
-                label="Giorni lavorati"
-                value={`${giorniLavorativi} / ${giorniLavorativiTotali}`}
-                sub={`${giorniRimanenti} giorni rimanenti`}
-                accent="blue"
-              />
+              <div className="flex items-baseline gap-1 leading-none">
+                <span className="text-6xl font-bold tabular-nums text-zinc-900">
+                  {hero.segno}{hero.ore}
+                </span>
+                <span
+                  className={`text-2xl font-semibold tabular-nums ${
+                    saldoComplessivoMin >= 0 ? "text-emerald-600" : "text-red-500"
+                  }`}
+                >
+                  h {String(hero.minuti).padStart(2, "0")}m
+                </span>
+              </div>
+
+              <span
+                className={`text-xs px-3 py-1 rounded-full font-medium tabular-nums ${
+                  saldoTotaleMin >= 0
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-red-50 text-red-600"
+                }`}
+              >
+                {isCurrentMonth ? "questo mese" : nomeMese(mese).toLowerCase()}{" "}
+                <span className="font-bold">
+                  {mesePill.segno}{mesePill.ore}h {String(mesePill.minuti).padStart(2, "0")}m
+                </span>
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* ── 2×2 stat grid ──────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-2">
+          {loading ? (
+            <>
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+            </>
+          ) : (
+            <>
+              {/* OGGI */}
               <StatCard
                 label="Oggi"
                 value={
-                  oreLavorateOggiMin !== null
-                    ? formatOre(oreLavorateOggiMin)
+                  oreOggiMin !== null
+                    ? `${Math.floor(oreOggiMin / 60)}h ${String(oreOggiMin % 60).padStart(2, "0")}m`
                     : oggiTimbratura
-                    ? tipoLabels[oggiTimbratura.tipo] ?? oggiTimbratura.tipo
-                    : "Non timbrato"
+                    ? TIPO_LABELS[oggiTimbratura.tipo]
+                    : "—"
                 }
                 sub={
-                  oreLavorateOggiMin !== null
-                    ? saldoPositivo || oreLavorateOggiMin >= ORARIO_CONTRATTUALE_MIN
-                      ? `+${formatOre(oreLavorateOggiMin - ORARIO_CONTRATTUALE_MIN)} rispetto al contratto`
-                      : `${formatOre(ORARIO_CONTRATTUALE_MIN - oreLavorateOggiMin)} mancanti`
+                  saldoOggiMin !== null
+                    ? `${formatMinuti(saldoOggiMin)} vs contratto`
+                    : !isCurrentMonth
+                    ? "altro mese"
                     : undefined
                 }
-                accent={
-                  oreLavorateOggiMin === null
-                    ? "gray"
-                    : oreLavorateOggiMin >= ORARIO_CONTRATTUALE_MIN
-                    ? "green"
-                    : "red"
+                color={
+                  oreOggiMin !== null
+                    ? saldoOggiMin !== null && saldoOggiMin >= 0
+                      ? "emerald"
+                      : "red"
+                    : "zinc"
                 }
               />
-            </div>
 
-            {/* Card secondarie */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {Object.entries(conteggioTipi).map(([tipo, conteggio]) => (
-                <StatCard
-                  key={tipo}
-                  label={tipoLabels[tipo] ?? tipo}
-                  value={`${conteggio} ${conteggio === 1 ? "giorno" : "giorni"}`}
+              {/* GIORNI */}
+              <StatCard
+                label="Giorni"
+                value={`${giorniLavorativi} / ${giorniLavorativiTotali}`}
+                sub="lavorati"
+                color="zinc"
+              />
+
+              {/* PROIEZIONE */}
+              <StatCard
+                label="Proiezione"
+                value={
+                  saldoProiettatoMin !== null
+                    ? formatMinuti(saldoProiettatoMin)
+                    : "—"
+                }
+                sub={
+                  saldoProiettatoMin !== null
+                    ? "fine mese"
+                    : giorniLavorativi <= 1
+                    ? "≥ 2 giorni lavorati"
+                    : "solo mese corrente"
+                }
+                color={
+                  saldoProiettatoMin !== null
+                    ? saldoProiettatoMin >= 0
+                      ? "emerald"
+                      : "red"
+                    : "zinc"
+                }
+              />
+
+              {/* ASSENZE */}
+              <StatCard
+                label="Assenze"
+                value={
+                  <span className="flex flex-wrap gap-1 mt-0.5">
+                    {(
+                      [
+                        { k: "ferie",    sigla: "F", cls: "bg-emerald-100 text-emerald-700" },
+                        { k: "permesso", sigla: "P", cls: "bg-orange-100 text-orange-700"  },
+                        { k: "malattia", sigla: "M", cls: "bg-red-100 text-red-700"        },
+                      ] as { k: TipoGiornata; sigla: string; cls: string }[]
+                    ).map(({ k, sigla, cls }) => (
+                      <span
+                        key={k}
+                        className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}
+                      >
+                        {sigla} {assenze[k] ?? 0}
+                      </span>
+                    ))}
+                  </span>
+                }
+              />
+            </>
+          )}
+        </div>
+
+        {/* ── Ledger — ultimi giorni ──────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-zinc-200 px-3 pb-1 pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">
+              Ultimi giorni
+            </span>
+            <Link
+              href={`/mese/${anno}/${String(mese).padStart(2, "0")}`}
+              className="text-xs text-zinc-500 hover:text-zinc-800 transition"
+            >
+              vai al mese →
+            </Link>
+          </div>
+
+          {loading ? (
+            <LedgerSkeleton />
+          ) : ultimiGiorni.length === 0 ? (
+            <p className="text-sm text-zinc-400 py-5 text-center">
+              Nessuna timbratura questo mese.
+            </p>
+          ) : (
+            <div className="flex flex-col">
+              {ultimiGiorni.map(([data, t]) => (
+                <DayRow
+                  key={data}
+                  data={data}
+                  timbratura={t}
+                  onClick={() => setModaleData(data)}
                 />
               ))}
-
-              {giorniLavorativi > 1 && (
-                <StatCard
-                  label="Proiezione fine mese"
-                  value={formatMinuti(Math.round(saldoProiettatoMin))}
-                  sub="se mantieni la media attuale"
-                  accent={saldoProiettatoMin >= 0 ? "green" : "red"}
-                />
-              )}
             </div>
-          </>
-        )}
+          )}
+        </div>
+
       </main>
+
+      {/* ── FAB ───────────────────────────────────────────────────────── */}
+      <button
+        onClick={() => setModaleData(dataOggi)}
+        aria-label="Timbra oggi"
+        className="fixed bottom-6 right-4 flex items-center gap-2 bg-zinc-900 text-white text-sm font-semibold px-5 py-3.5 rounded-full shadow-lg hover:bg-zinc-800 active:scale-95 transition-all z-10"
+      >
+        <span className="text-base leading-none font-light">+</span>
+        timbra oggi
+      </button>
+
+      {/* ── Modale timbratura ─────────────────────────────────────────── */}
+      {modaleData && (
+        <ModaleTimbratura
+          data={modaleData}
+          iniziale={timbrature[modaleData] ?? null}
+          onSalva={(t) => handleSalva(modaleData, t)}
+          onChiudi={() => setModaleData(null)}
+        />
+      )}
     </div>
   );
 }
+
+// ── export ────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
   return (
