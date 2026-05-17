@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:local": "concurrently --kill-others --names \"emulators,next\" --prefix-colors \"yellow,cyan\" \"firebase emulators:start --only auth,firestore\" \"wait-on http://localhost:9099 && next dev\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -20,9 +21,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^9.0.10"
   }
 }
