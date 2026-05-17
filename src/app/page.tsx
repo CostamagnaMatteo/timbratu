@@ -120,7 +120,7 @@ function StatCard({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-zinc-200 p-3 flex flex-col gap-0.5 min-h-[76px]">
+    <div className="bg-white rounded-xl border border-[#ebe2cc] p-3 flex flex-col gap-0.5 min-h-[76px]">
       <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest leading-none">
         {label}
       </span>
@@ -138,7 +138,7 @@ function StatCard({
 
 function StatCardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-zinc-200 p-3 min-h-[76px] flex flex-col gap-2 animate-pulse">
+    <div className="bg-white rounded-xl border border-[#ebe2cc] p-3 min-h-[76px] flex flex-col gap-2 animate-pulse">
       <div className="h-2.5 w-12 bg-zinc-100 rounded" />
       <div className="h-6 w-20 bg-zinc-100 rounded" />
       <div className="h-2 w-16 bg-zinc-100 rounded" />
@@ -309,10 +309,10 @@ function HomeContent() {
   // ── render ────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen bg-[#f8f3e6]">
 
       {/* ── Header ────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-zinc-200 px-4 py-3">
+      <header className="sticky top-0 z-20 bg-[#f8f3e6]/90 backdrop-blur border-b border-[#ebe2cc] px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <span className="text-base font-semibold text-zinc-900 tracking-tight">Timbratuu</span>
           <div className="flex items-center gap-2">
@@ -484,7 +484,7 @@ function HomeContent() {
         </div>
 
         {/* ── Ledger — ultimi giorni ──────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-zinc-200 px-3 pb-1 pt-3">
+        <div className="bg-white rounded-xl border border-[#ebe2cc] px-3 pb-1 pt-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">
               Ultimi giorni
