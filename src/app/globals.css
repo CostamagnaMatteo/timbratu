@@ -10,6 +10,13 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* ── Tema Timbratuu (palette carta/parchment) ── */
+  --color-carta: #f8f3e6;       /* sfondo principale */
+  --color-carta-50: #fff8e8;    /* card oggi in corso */
+  --color-carta-100: #f4ead2;   /* hover righe ledger */
+  --color-carta-200: #ebe2cc;   /* bordi e hover navigazione */
+  --color-ink-muted: #8a8579;   /* testo neutro / saldo zero */
 }
 
 @utility font-caveat {

@@ -115,7 +115,7 @@ function MonthBar({
       <button
         onClick={() => onChange(annoPrev, mesePrev)}
         aria-label="Mese precedente"
-        className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-zinc-700 text-zinc-700 hover:bg-[#ebe2cc] transition text-2xl leading-none"
+        className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-zinc-700 text-zinc-700 hover:bg-carta-200 transition text-2xl leading-none"
       >
         ‹
       </button>
@@ -130,8 +130,8 @@ function MonthBar({
         className={[
           "w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border text-2xl leading-none transition",
           nextDisabled
-            ? "border-zinc-300 text-zinc-300 cursor-not-allowed bg-[#ebe2cc]/50"
-            : "border-zinc-700 text-zinc-700 hover:bg-[#ebe2cc]",
+            ? "border-zinc-300 text-zinc-300 cursor-not-allowed bg-carta-200/50"
+            : "border-zinc-700 text-zinc-700 hover:bg-carta-200",
         ].join(" ")}
       >
         ›
@@ -154,7 +154,7 @@ function TodayInProgressCard({
   onChiudiFascia: () => void;
 }) {
   return (
-    <div className="rounded-xl border-2 border-zinc-800 bg-[#fff8e8] p-3 flex flex-col gap-2 shadow-[2px_2px_0_0_rgba(31,29,26,0.12)]">
+    <div className="rounded-xl border-2 border-zinc-800 bg-carta-50 p-3 flex flex-col gap-2 shadow-[2px_2px_0_0_rgba(31,29,26,0.12)]">
       <div className="flex items-baseline justify-between">
         <span className="text-base font-semibold text-zinc-800 font-caveat">
           oggi · {etichettaGiorno(data)}
@@ -201,11 +201,11 @@ function StatCard({
     emerald: "text-emerald-600",
     red:     "text-red-500",
     zinc:    "text-zinc-800",
-    muted:   "text-[#8a8579]",
+    muted:   "text-ink-muted",
   };
 
   return (
-    <div className="bg-white rounded-xl border border-[#ebe2cc] p-3 flex flex-col gap-0.5 min-h-[76px]">
+    <div className="bg-white rounded-xl border border-carta-200 p-3 flex flex-col gap-0.5 min-h-[76px]">
       <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest leading-none font-patrick-hand">
         {label}
       </span>
@@ -223,7 +223,7 @@ function StatCard({
 
 function StatCardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-[#ebe2cc] p-3 min-h-[76px] flex flex-col gap-2 animate-pulse">
+    <div className="bg-white rounded-xl border border-carta-200 p-3 min-h-[76px] flex flex-col gap-2 animate-pulse">
       <div className="h-2.5 w-12 bg-zinc-100 rounded" />
       <div className="h-6 w-20 bg-zinc-100 rounded" />
       <div className="h-2 w-16 bg-zinc-100 rounded" />
@@ -279,7 +279,7 @@ function DayRow({
   return (
     <button
       onClick={onClick}
-      className="grid grid-cols-[60px_1fr_auto] items-center gap-2 py-2.5 border-b border-dotted border-zinc-300 last:border-0 text-left w-full hover:bg-[#f4ead2] rounded-lg px-1 transition"
+      className="grid grid-cols-[60px_1fr_auto] items-center gap-2 py-2.5 border-b border-dotted border-zinc-300 last:border-0 text-left w-full hover:bg-carta-100 rounded-lg px-1 transition"
     >
       <span className="text-[13px] font-medium text-zinc-700 tabular-nums">
         {etichettaGiorno(data)}
@@ -294,7 +294,7 @@ function DayRow({
             ? "text-emerald-600"
             : saldoGiornoMin < 0
             ? "text-red-500"
-            : "text-[#8a8579]",
+            : "text-ink-muted",
         ].join(" ")}
       >
         {saldo}
@@ -390,10 +390,10 @@ function HomeContent() {
   // ── render ────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#f8f3e6]">
+    <div className="min-h-screen bg-carta">
 
       {/* ── Header ────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 bg-[#f8f3e6]/90 backdrop-blur border-b border-[#ebe2cc] px-4 py-3">
+      <header className="sticky top-0 z-20 bg-carta/90 backdrop-blur border-b border-carta-200 px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <span
             className="text-xl font-bold text-zinc-900 font-caveat"
@@ -463,7 +463,7 @@ function HomeContent() {
                     ? "text-emerald-600"
                     : heroMin < 0
                     ? "text-red-500"
-                    : "text-[#8a8579]"
+                    : "text-ink-muted"
                 }`}
               >
                 <span className="text-6xl">{hero.segno}{hero.ore}</span>
@@ -477,7 +477,7 @@ function HomeContent() {
                       ? "bg-emerald-100 text-emerald-700 border-emerald-200"
                       : saldoTotaleMin < 0
                       ? "bg-red-100 text-red-600 border-red-200"
-                      : "bg-stone-100 text-[#8a8579] border-stone-200"
+                      : "bg-stone-100 text-ink-muted border-stone-200"
                   }`}
                 >
                   questo mese{" "}
@@ -551,7 +551,7 @@ function HomeContent() {
         </div>
 
         {/* ── Ledger — ultimi giorni ──────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-[#ebe2cc] px-3 pb-1 pt-3">
+        <div className="bg-white rounded-xl border border-carta-200 px-3 pb-1 pt-3">
           <div className="flex items-baseline justify-between mb-1">
             <span className="text-base font-semibold text-zinc-800 font-caveat">ultimi giorni</span>
             <Link
@@ -601,7 +601,7 @@ function HomeContent() {
         <button
           onClick={tornaAOggi}
           aria-label="Torna al mese corrente"
-          className="fixed bottom-6 right-4 flex items-center gap-2 bg-[#f8f3e6] text-zinc-900 border-2 border-zinc-800 px-5 py-3 rounded-full shadow-md hover:bg-[#ebe2cc] active:scale-95 transition-all z-10 font-caveat text-base"
+          className="fixed bottom-6 right-4 flex items-center gap-2 bg-carta text-zinc-900 border-2 border-zinc-800 px-5 py-3 rounded-full shadow-md hover:bg-carta-200 active:scale-95 transition-all z-10 font-caveat text-base"
         >
           ↺ torna a oggi
         </button>
