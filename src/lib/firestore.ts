@@ -1,6 +1,7 @@
 import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Shift, AggregazioneMese } from "@/types/timbratura";
+import { AggregazioneMese } from "@/types/timbratura";
+import { Shift } from "@/types/shift";
 
 function timbraturaPath(uid: string, data: string) {
   return doc(db, "users", uid, "timbrature", data);

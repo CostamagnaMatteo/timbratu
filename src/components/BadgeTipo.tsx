@@ -1,4 +1,4 @@
-import { ShiftType } from "@/types/timbratura";
+import { ShiftType } from "@/types/shift";
 
 const CONFIG: Record<ShiftType, { label: string; className: string }> = {
   lavoro:    { label: "Lavoro",    className: "bg-blue-100 text-blue-700" },

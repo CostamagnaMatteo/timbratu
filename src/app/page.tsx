@@ -20,7 +20,7 @@ import {
   mesePrecedente,
   meseSuccessivo,
 } from "@/lib/date-utils";
-import { Shift, ShiftType } from "@/types/timbratura";
+import { Shift, ShiftType } from "@/types/shift";
 
 // ── costanti ─────────────────────────────────────────────────────────────
 

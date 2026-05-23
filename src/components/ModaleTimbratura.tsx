@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Shift, ShiftType, TimeRange, ModaleTimbraturaProps } from "@/types/timbratura";
+import { ModaleTimbraturaProps } from "@/types/timbratura";
 import { formatOre } from "@/lib/calcolo-ore";
+import { ShiftType, TimeRange, Shift } from "@/types/shift";
 
 const TIPI: { valore: ShiftType; label: string }[] = [
   { valore: "lavoro",   label: "Lavoro"   },

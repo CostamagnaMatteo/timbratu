@@ -1,4 +1,5 @@
-import { TimeRange, Shift, CalcoloGiorno, CalcoloMese } from "@/types/timbratura";
+import { TimeRange, Shift } from "@/types/shift";
+import { CalcoloGiorno, CalcoloMese } from "@/types/timbratura";
 
 const ORARIO_CONTRATTUALE_MIN = 432; // 7h 12min
 const SOGLIA_PAUSA_MIN        = 480; // 8h
@@ -29,7 +30,7 @@ export function calcolaMese(timbrature: Record<string, Shift>): CalcoloMese {
 
   for (const t of Object.values(timbrature)) {
     if (t.tipo === "lavoro" && t.fasce?.length) {
-      saldoTotaleMin += calcolaGiorno(t.fasce).saldoMin;
+      saldoTotaleMin += calcolaGiorno(t.fasce!).saldoMin;
       giorniLavorativi++;
     }
   }
