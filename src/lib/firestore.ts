@@ -1,6 +1,6 @@
 import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Timbratura, AggregazioneMese } from "@/types/timbratura";
+import { Shift, AggregazioneMese } from "@/types/timbratura";
 
 function timbraturaPath(uid: string, data: string) {
   return doc(db, "users", uid, "timbrature", data);
@@ -10,7 +10,7 @@ export async function getTimbrattureMese(
   uid: string,
   anno: number,
   mese: number
-): Promise<Record<string, Timbratura>> {
+): Promise<Record<string, Shift>> {
   const inizio = `${anno}-${String(mese).padStart(2, "0")}-01`;
   const fine   = `${anno}-${String(mese).padStart(2, "0")}-31`;
 
@@ -22,30 +22,30 @@ export async function getTimbrattureMese(
   );
 
   const snap = await getDocs(q);
-  const result: Record<string, Timbratura> = {};
-  snap.forEach((d) => { result[d.id] = d.data() as Timbratura; });
+  const result: Record<string, Shift> = {};
+  snap.forEach((d) => { result[d.id] = d.data() as Shift; });
   return result;
 }
 
 export async function getTutteLeTimbrature(
   uid: string
-): Promise<Record<string, Timbratura>> {
+): Promise<Record<string, Shift>> {
   const q = query(
     collection(db, "users", uid, "timbrature"),
     orderBy("__name__", "asc")
   );
   const snap = await getDocs(q);
-  const result: Record<string, Timbratura> = {};
-  snap.forEach((d) => { result[d.id] = d.data() as Timbratura; });
+  const result: Record<string, Shift> = {};
+  snap.forEach((d) => { result[d.id] = d.data() as Shift; });
   return result;
 }
 
-export async function getTimbratura(uid: string, data: string): Promise<Timbratura | null> {
+export async function getTimbratura(uid: string, data: string): Promise<Shift | null> {
   const snap = await getDoc(timbraturaPath(uid, data));
-  return snap.exists() ? (snap.data() as Timbratura) : null;
+  return snap.exists() ? (snap.data() as Shift) : null;
 }
 
-export async function setTimbratura(uid: string, data: string, t: Timbratura): Promise<void> {
+export async function setTimbratura(uid: string, data: string, t: Shift): Promise<void> {
   await setDoc(timbraturaPath(uid, data), t);
 }
 

@@ -11,7 +11,7 @@ import {
   setTimbratura,
 } from "@/lib/firestore";
 import { aggrega } from "@/lib/aggregazione";
-import { calcolaMese, calcolaGiorno, formatMinuti } from "@/lib/calcolo-ore";
+import { calcolaMese, calcolaGiorno } from "@/lib/calcolo-ore";
 import {
   giorniDelMese,
   nomeMese,
@@ -20,13 +20,11 @@ import {
   mesePrecedente,
   meseSuccessivo,
 } from "@/lib/date-utils";
-import { Timbratura, TipoGiornata } from "@/types/timbratura";
+import { Shift, ShiftType } from "@/types/timbratura";
 
 // ── costanti ─────────────────────────────────────────────────────────────
 
-const ORARIO_CONTRATTUALE_MIN = 432; // 7h 12min
-
-const TIPO_LABELS: Record<TipoGiornata, string> = {
+const TIPO_LABELS: Record<ShiftType, string> = {
   lavoro:   "Lavoro",
   ferie:    "Ferie",
   permesso: "Permesso",
@@ -41,13 +39,7 @@ function oggiLocale(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-interface BilancioParts {
-  segno: "+" | "-";
-  ore: number;
-  minuti: number;
-}
-
-function splitBilancio(min: number): BilancioParts {
+function splitBilancio(min: number) {
   const abs = Math.abs(min);
   return {
     segno: min >= 0 ? "+" : "-",
@@ -60,7 +52,6 @@ function etichettaGiorno(data: string): string {
   return `${nomeGiorno(data).toLowerCase()} ${data.slice(8)}`;
 }
 
-// Formato compatto "h m" (es. +1h 18m) usato nella UI — distinto da formatMinuti che usa "min"
 function formatM(min: number): string {
   const segno = min >= 0 ? "+" : "-";
   const abs   = Math.abs(min);
@@ -71,21 +62,53 @@ function formatM(min: number): string {
     : `${segno}${m}m`;
 }
 
-// ── MonthPicker ──────────────────────────────────────────────────────────
+// Saldo della settimana corrente (lun-dom) sulle timbrature caricate
+function calcolaSaldoSettimana(timbrature: Record<string, Shift>): number {
+  const now = new Date();
+  const dow = now.getDay();
+  const diff = dow === 0 ? 6 : dow - 1;
+  const lunedi = new Date(now);
+  lunedi.setDate(now.getDate() - diff);
 
-function MonthPicker({
+  let saldo = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(lunedi);
+    d.setDate(lunedi.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    const t = timbrature[key];
+    if (t?.tipo === "lavoro" && t.fasce?.length) {
+      saldo += calcolaGiorno(t.fasce).saldoMin;
+    }
+  }
+  return saldo;
+}
+
+// Somma dei delta positivi del mese (straordinari lordi)
+function calcolaStraordinari(timbrature: Record<string, Shift>): number {
+  return Object.values(timbrature)
+    .filter((t) => t.tipo === "lavoro" && t.fasce?.length)
+    .reduce((acc, t) => {
+      const { saldoMin } = calcolaGiorno(t.fasce!);
+      return saldoMin > 0 ? acc + saldoMin : acc;
+    }, 0);
+}
+
+// ── MonthBar ──────────────────────────────────────────────────────────────
+
+function MonthBar({
   anno,
   mese,
+  nextDisabled,
   onChange,
 }: {
   anno: number;
   mese: number;
+  nextDisabled: boolean;
   onChange: (a: number, m: number) => void;
 }) {
   const { anno: annoPrev, mese: mesePrev } = mesePrecedente(anno, mese);
   const { anno: annoNext, mese: meseNext } = meseSuccessivo(anno, mese);
-  const annoCorrente = new Date().getFullYear();
-  const label = `${nomeMese(mese).toLowerCase()}${anno !== annoCorrente ? ` ${anno}` : ""}`;
+  const label = `${nomeMese(mese).toLowerCase()} ${anno}`;
 
   return (
     <div className="flex items-center gap-2 w-full border-2 border-zinc-800 rounded-xl px-2 py-1.5 shadow-[2px_2px_0_0_rgba(31,29,26,0.12)]">
@@ -97,15 +120,66 @@ function MonthPicker({
         ‹
       </button>
       <div className="flex-1 text-center">
-        <span className="text-2xl font-semibold text-zinc-900">{label}</span>
+        <span className="text-2xl font-semibold text-zinc-900 font-caveat">{label}</span>
       </div>
       <button
-        onClick={() => onChange(annoNext, meseNext)}
+        onClick={() => { if (!nextDisabled) onChange(annoNext, meseNext); }}
         aria-label="Mese successivo"
-        className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-zinc-700 text-zinc-700 hover:bg-[#ebe2cc] transition text-2xl leading-none"
+        disabled={nextDisabled}
+        title={nextDisabled ? "non puoi andare oltre il mese corrente" : undefined}
+        className={[
+          "w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border text-2xl leading-none transition",
+          nextDisabled
+            ? "border-zinc-300 text-zinc-300 cursor-not-allowed bg-[#ebe2cc]/50"
+            : "border-zinc-700 text-zinc-700 hover:bg-[#ebe2cc]",
+        ].join(" ")}
       >
         ›
       </button>
+    </div>
+  );
+}
+
+// ── TodayInProgressCard ───────────────────────────────────────────────────
+
+function TodayInProgressCard({
+  data,
+  entrata,
+  onModifica,
+  onChiudiFascia,
+}: {
+  data: string;
+  entrata: string;
+  onModifica: () => void;
+  onChiudiFascia: () => void;
+}) {
+  return (
+    <div className="rounded-xl border-2 border-zinc-800 bg-[#fff8e8] p-3 flex flex-col gap-2 shadow-[2px_2px_0_0_rgba(31,29,26,0.12)]">
+      <div className="flex items-baseline justify-between">
+        <span className="text-base font-semibold text-zinc-800 font-caveat">
+          oggi · {etichettaGiorno(data)}
+        </span>
+        <span className="text-sm text-zinc-400 font-patrick-hand">in corso…</span>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="text-3xl font-bold tabular-nums text-zinc-800 font-caveat">
+          {entrata} → ?
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-2 mt-1">
+        <button
+          onClick={onModifica}
+          className="px-3 py-1.5 rounded-full border-2 border-zinc-800 text-sm font-medium text-zinc-800 hover:bg-zinc-100 transition font-caveat"
+        >
+          modifica
+        </button>
+        <button
+          onClick={onChiudiFascia}
+          className="px-3 py-1.5 rounded-full bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-700 transition font-caveat"
+        >
+          + chiudi fascia
+        </button>
+      </div>
     </div>
   );
 }
@@ -121,21 +195,21 @@ function StatCard({
   label: string;
   value: React.ReactNode;
   sub?: string;
-  color?: "emerald" | "red" | "zinc" | "amber";
+  color?: "emerald" | "red" | "zinc" | "muted";
 }) {
   const textColor: Record<string, string> = {
     emerald: "text-emerald-600",
     red:     "text-red-500",
     zinc:    "text-zinc-800",
-    amber:   "text-amber-500",
+    muted:   "text-[#8a8579]",
   };
 
   return (
     <div className="bg-white rounded-xl border border-[#ebe2cc] p-3 flex flex-col gap-0.5 min-h-[76px]">
-      <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest leading-none">
+      <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest leading-none font-patrick-hand">
         {label}
       </span>
-      <span className={`text-xl font-bold tabular-nums leading-snug ${textColor[color]}`}>
+      <span className={`text-xl font-bold tabular-nums leading-snug font-caveat ${textColor[color]}`}>
         {value}
       </span>
       {sub && (
@@ -185,7 +259,7 @@ function DayRow({
   onClick,
 }: {
   data: string;
-  timbratura: Timbratura;
+  timbratura: Shift;
   onClick: () => void;
 }) {
   const { tipo, fasce } = timbratura;
@@ -195,12 +269,12 @@ function DayRow({
     ? `${fasce![0].entrata} → ${fasce![fasce!.length - 1].uscita}`
     : TIPO_LABELS[tipo].toLowerCase();
 
-  const { saldo, isPositivo } = isLavoro
+  const { saldo, saldoGiornoMin } = isLavoro
     ? (() => {
         const { saldoMin } = calcolaGiorno(fasce!);
-        return { saldo: formatMinuti(saldoMin), isPositivo: saldoMin >= 0 };
+        return { saldo: formatM(saldoMin), saldoGiornoMin: saldoMin };
       })()
-    : { saldo: "—", isPositivo: null };
+    : { saldo: "—", saldoGiornoMin: null };
 
   return (
     <button
@@ -213,12 +287,14 @@ function DayRow({
       <span className="text-[13px] text-zinc-400 font-mono truncate">{orario}</span>
       <span
         className={[
-          "text-[13px] font-semibold tabular-nums text-right w-[72px] shrink-0",
-          isPositivo === null
+          "text-[13px] font-semibold tabular-nums text-right w-[72px] shrink-0 font-caveat",
+          saldoGiornoMin === null
             ? "text-zinc-400"
-            : isPositivo
+            : saldoGiornoMin > 0
             ? "text-emerald-600"
-            : "text-red-500",
+            : saldoGiornoMin < 0
+            ? "text-red-500"
+            : "text-[#8a8579]",
         ].join(" ")}
       >
         {saldo}
@@ -237,7 +313,7 @@ function HomeContent() {
   const [mese, setMese]   = useState(now.getMonth() + 1);
   const dataOggi = oggiLocale();
 
-  const [timbrature, setTimbrature]               = useState<Record<string, Timbratura>>({});
+  const [timbrature, setTimbrature]               = useState<Record<string, Shift>>({});
   const [saldoComplessivoMin, setSaldoComplessivo] = useState(0);
   const [loading, setLoading]                     = useState(true);
   const [modaleData, setModaleData]               = useState<string | null>(null);
@@ -266,45 +342,34 @@ function HomeContent() {
 
   const giorni = giorniDelMese(anno, mese);
   const giorniLavorativiTotali = giorni.filter((g) => !isWeekend(g)).length;
-  const giorniRimanenti        = giorni.filter((g) => g >= dataOggi && !isWeekend(g)).length;
 
   const { saldoTotaleMin, giorniLavorativi } = calcolaMese(timbrature);
 
-  const oggiTimbratura = isCurrentMonth ? timbrature[dataOggi] : undefined;
-  const oreOggiMin =
-    oggiTimbratura?.tipo === "lavoro" && oggiTimbratura.fasce?.length
-      ? calcolaGiorno(oggiTimbratura.fasce).oreNetteMin
-      : null;
-  const saldoOggiMin =
-    oggiTimbratura?.tipo === "lavoro" && oggiTimbratura.fasce?.length
-      ? calcolaGiorno(oggiTimbratura.fasce).saldoMin
-      : null;
+  // Hero: banca ore complessiva per mese corrente, saldo mese per mese passato
+  const heroMin = isCurrentMonth ? saldoComplessivoMin : saldoTotaleMin;
+  const hero = splitBilancio(heroMin);
+  const mesePill = splitBilancio(saldoTotaleMin);
 
-  const assenze = Object.values(timbrature).reduce(
-    (acc, t) => {
-      if (t.tipo !== "lavoro") acc[t.tipo] = (acc[t.tipo] ?? 0) + 1;
-      return acc;
-    },
-    {} as Partial<Record<TipoGiornata, number>>
-  );
+  // Fascia in corso: ultima fascia di oggi senza uscita (solo mese corrente)
+  const fasciaInCorso = isCurrentMonth
+    ? (() => {
+        const oggi = timbrature[dataOggi];
+        if (oggi?.tipo !== "lavoro" || !oggi.fasce?.length) return null;
+        const ultima = oggi.fasce[oggi.fasce.length - 1];
+        return !ultima.uscita ? ultima : null;
+      })()
+    : null;
 
-  const mediaGiornalieraMin =
-    giorniLavorativi > 1 ? saldoTotaleMin / giorniLavorativi : null;
-  const saldoProiettatoMin =
-    mediaGiornalieraMin !== null && isCurrentMonth
-      ? Math.round(saldoTotaleMin + mediaGiornalieraMin * giorniRimanenti)
-      : null;
+  const saldoSettimanaMin = isCurrentMonth ? calcolaSaldoSettimana(timbrature) : null;
+  const straordinariMin   = !isCurrentMonth ? calcolaStraordinari(timbrature) : null;
 
   const ultimiGiorni = Object.entries(timbrature)
     .sort(([a], [b]) => b.localeCompare(a))
     .slice(0, 5);
 
-  const hero     = splitBilancio(saldoComplessivoMin);
-  const mesePill = splitBilancio(saldoTotaleMin);
-
   // ── salva timbratura ──────────────────────────────────────────────────
 
-  const handleSalva = async (data: string, t: Timbratura) => {
+  const handleSalva = async (data: string, t: Shift) => {
     if (!user) return;
     await setTimbratura(user.uid, data, t);
     await aggrega(
@@ -317,6 +382,11 @@ function HomeContent() {
     caricaDati();
   };
 
+  const tornaAOggi = () => {
+    setAnno(now.getFullYear());
+    setMese(now.getMonth() + 1);
+  };
+
   // ── render ────────────────────────────────────────────────────────────
 
   return (
@@ -325,7 +395,12 @@ function HomeContent() {
       {/* ── Header ────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 bg-[#f8f3e6]/90 backdrop-blur border-b border-[#ebe2cc] px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <span className="text-base font-semibold text-zinc-900 tracking-tight">Timbratuu</span>
+          <span
+            className="text-xl font-bold text-zinc-900 font-caveat"
+            style={{ transform: "rotate(-1deg)", display: "inline-block" }}
+          >
+            Timbratuu
+          </span>
           <div className="flex items-center gap-2">
             {user?.photoURL ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -349,140 +424,127 @@ function HomeContent() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 pb-28 flex flex-col gap-5">
+      <main className="max-w-lg mx-auto px-4 pb-28 flex flex-col gap-4">
 
         {/* ── Month picker ───────────────────────────────────────────── */}
         <div className="pt-5">
-          <MonthPicker
+          <MonthBar
             anno={anno}
             mese={mese}
+            nextDisabled={isCurrentMonth}
             onChange={(a, m) => { setAnno(a); setMese(m); }}
           />
         </div>
 
+        {/* ── Badge mese chiuso (solo mese passato) ──────────────────── */}
+        {!isCurrentMonth && (
+          <div className="flex justify-center">
+            <span className="text-sm px-3 py-1 rounded-full border-2 border-dashed border-stone-400 bg-stone-100 text-stone-600 font-patrick-hand">
+              📁 mese chiuso · sola lettura
+            </span>
+          </div>
+        )}
+
         {/* ── Hero saldo ─────────────────────────────────────────────── */}
-        <div className="flex flex-col items-center gap-2 py-4">
+        <div className="flex flex-col items-center gap-2 py-2">
           {loading ? (
             <HeroSkeleton />
           ) : (
             <>
-              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-widest">
-                La tua banca ore
+              <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-widest font-patrick-hand">
+                {isCurrentMonth
+                  ? "La tua banca ore"
+                  : `Saldo di ${nomeMese(mese).toLowerCase()}`}
               </span>
 
-              <div className="flex items-baseline gap-1 leading-none">
-                <span className="text-6xl font-bold tabular-nums text-zinc-900">
-                  {hero.segno}{hero.ore}
-                </span>
-                <span
-                  className={`text-2xl font-semibold tabular-nums ${
-                    saldoComplessivoMin >= 0 ? "text-emerald-600" : "text-red-500"
-                  }`}
-                >
-                  h {String(hero.minuti).padStart(2, "0")}m
-                </span>
+              <div
+                className={`flex items-baseline gap-0.5 leading-none tabular-nums font-caveat font-bold ${
+                  heroMin > 0
+                    ? "text-emerald-600"
+                    : heroMin < 0
+                    ? "text-red-500"
+                    : "text-[#8a8579]"
+                }`}
+              >
+                <span className="text-6xl">{hero.segno}{hero.ore}</span>
+                <span className="text-2xl">h {String(hero.minuti).padStart(2, "0")}m</span>
               </div>
 
-              <span className="text-xs px-3 py-1 rounded-full font-medium tabular-nums bg-[#f4ead2] text-zinc-700 border border-[#ebe2cc]">
-                {isCurrentMonth ? "questo mese" : nomeMese(mese).toLowerCase()}{" "}
-                <span className={`font-bold ${saldoTotaleMin >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-                  {mesePill.segno}{mesePill.ore}h {String(mesePill.minuti).padStart(2, "0")}m
+              {isCurrentMonth ? (
+                <span
+                  className={`text-xs px-3 py-1 rounded-full font-medium tabular-nums font-patrick-hand border ${
+                    saldoTotaleMin > 0
+                      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                      : saldoTotaleMin < 0
+                      ? "bg-red-100 text-red-600 border-red-200"
+                      : "bg-stone-100 text-[#8a8579] border-stone-200"
+                  }`}
+                >
+                  questo mese{" "}
+                  <span className="font-bold font-caveat">
+                    {mesePill.segno}{mesePill.ore}h {String(mesePill.minuti).padStart(2, "0")}m
+                  </span>
                 </span>
-              </span>
+              ) : (
+                <span className="text-xs px-3 py-1 rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 font-patrick-hand">
+                  {giorniLavorativiTotali} giorni lavorativi
+                </span>
+              )}
             </>
           )}
         </div>
 
-        {/* ── 2×2 stat grid ──────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* ── Card oggi in corso (fascia aperta) ─────────────────────── */}
+        {!loading && fasciaInCorso && (
+          <TodayInProgressCard
+            data={dataOggi}
+            entrata={fasciaInCorso.entrata}
+            onModifica={() => setModaleData(dataOggi)}
+            onChiudiFascia={() => setModaleData(dataOggi)}
+          />
+        )}
+
+        {/* ── Mini grid 2 card ───────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3">
           {loading ? (
             <>
               <StatCardSkeleton />
               <StatCardSkeleton />
-              <StatCardSkeleton />
-              <StatCardSkeleton />
             </>
-          ) : (
+          ) : isCurrentMonth ? (
             <>
-              {/* OGGI */}
               <StatCard
-                label="Oggi"
-                value={
-                  oreOggiMin !== null
-                    ? `${Math.floor(oreOggiMin / 60)}h ${String(oreOggiMin % 60).padStart(2, "0")}m`
-                    : oggiTimbratura
-                    ? TIPO_LABELS[oggiTimbratura.tipo]
-                    : "—"
-                }
-                sub={
-                  saldoOggiMin !== null
-                    ? formatM(saldoOggiMin)
-                    : !isCurrentMonth
-                    ? "altro mese"
-                    : undefined
-                }
+                label="Settimana"
+                value={formatM(saldoSettimanaMin ?? 0)}
+                sub="vs contrattuale"
                 color={
-                  oreOggiMin !== null
-                    ? saldoOggiMin !== null && saldoOggiMin >= 0
-                      ? "emerald"
-                      : "red"
-                    : "zinc"
+                  (saldoSettimanaMin ?? 0) > 0
+                    ? "emerald"
+                    : (saldoSettimanaMin ?? 0) < 0
+                    ? "red"
+                    : "muted"
                 }
               />
-
-              {/* GIORNI */}
               <StatCard
                 label="Giorni"
                 value={`${giorniLavorativi} / ${giorniLavorativiTotali}`}
                 sub="lavorati"
                 color="zinc"
               />
-
-              {/* PROIEZIONE */}
+            </>
+          ) : (
+            <>
               <StatCard
-                label="Proiezione"
-                value={
-                  saldoProiettatoMin !== null
-                    ? formatM(saldoProiettatoMin)
-                    : "—"
-                }
-                sub={
-                  saldoProiettatoMin !== null
-                    ? "fine mese"
-                    : giorniLavorativi <= 1
-                    ? "≥ 2 giorni lavorati"
-                    : "solo mese corrente"
-                }
-                color={
-                  saldoProiettatoMin !== null
-                    ? saldoProiettatoMin >= 0
-                      ? "emerald"
-                      : "red"
-                    : "zinc"
-                }
+                label="Straordinari"
+                value={formatM(straordinariMin ?? 0)}
+                sub="somma positivi"
+                color="emerald"
               />
-
-              {/* ASSENZE */}
               <StatCard
-                label="Assenze"
-                value={
-                  <span className="flex flex-wrap gap-1 mt-0.5">
-                    {(
-                      [
-                        { k: "ferie",    sigla: "F", cls: "bg-emerald-100 text-emerald-700" },
-                        { k: "permesso", sigla: "P", cls: "bg-orange-100 text-orange-700"  },
-                        { k: "malattia", sigla: "M", cls: "bg-red-100 text-red-700"        },
-                      ] as { k: TipoGiornata; sigla: string; cls: string }[]
-                    ).map(({ k, sigla, cls }) => (
-                      <span
-                        key={k}
-                        className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold ${cls}`}
-                      >
-                        {sigla} {assenze[k] ?? 0}
-                      </span>
-                    ))}
-                  </span>
-                }
+                label="Giorni"
+                value={`${giorniLavorativi} / ${giorniLavorativiTotali}`}
+                sub="lavorati"
+                color="zinc"
               />
             </>
           )}
@@ -491,7 +553,7 @@ function HomeContent() {
         {/* ── Ledger — ultimi giorni ──────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-[#ebe2cc] px-3 pb-1 pt-3">
           <div className="flex items-baseline justify-between mb-1">
-            <span className="text-base font-semibold text-zinc-800">ultimi giorni</span>
+            <span className="text-base font-semibold text-zinc-800 font-caveat">ultimi giorni</span>
             <Link
               href={`/mese/${anno}/${String(mese).padStart(2, "0")}`}
               className="text-xs text-zinc-500 hover:text-zinc-800 transition"
@@ -505,7 +567,9 @@ function HomeContent() {
             <LedgerSkeleton />
           ) : ultimiGiorni.length === 0 ? (
             <p className="text-sm text-zinc-400 py-5 text-center">
-              Nessuna timbratura questo mese.
+              {isCurrentMonth
+                ? "Nessuna timbratura questo mese."
+                : "Nessuna timbratura registrata."}
             </p>
           ) : (
             <div className="flex flex-col">
@@ -524,14 +588,24 @@ function HomeContent() {
       </main>
 
       {/* ── FAB ───────────────────────────────────────────────────────── */}
-      <button
-        onClick={() => setModaleData(dataOggi)}
-        aria-label="Timbra oggi"
-        className="fixed bottom-6 right-4 flex items-center gap-2 bg-zinc-900 text-white text-sm font-semibold px-5 py-3.5 rounded-full shadow-lg hover:bg-zinc-800 active:scale-95 transition-all z-10"
-      >
-        <span className="text-base leading-none font-light">+</span>
-        timbra oggi
-      </button>
+      {isCurrentMonth ? (
+        <button
+          onClick={() => setModaleData(dataOggi)}
+          aria-label="Timbra oggi"
+          className="fixed bottom-6 right-4 flex items-center gap-2 bg-zinc-900 text-white px-5 py-3.5 rounded-full shadow-lg hover:bg-zinc-800 active:scale-95 transition-all z-10 font-caveat text-base"
+        >
+          <span className="text-base leading-none font-light">+</span>
+          timbra oggi
+        </button>
+      ) : (
+        <button
+          onClick={tornaAOggi}
+          aria-label="Torna al mese corrente"
+          className="fixed bottom-6 right-4 flex items-center gap-2 bg-[#f8f3e6] text-zinc-900 border-2 border-zinc-800 px-5 py-3 rounded-full shadow-md hover:bg-[#ebe2cc] active:scale-95 transition-all z-10 font-caveat text-base"
+        >
+          ↺ torna a oggi
+        </button>
+      )}
 
       {/* ── Modale timbratura ─────────────────────────────────────────── */}
       {modaleData && (

@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# issue locali (generati da scripts/sync-issues.sh)
+/docs/issues/

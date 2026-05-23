@@ -4,14 +4,9 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { formatMinuti } from "@/lib/calcolo-ore";
+import { MonthlyDetailHeaderProps } from "@/types/timbratura";
 
-interface Props {
-  anno:           number;
-  mese:           number;
-  saldoTotaleMin: number;
-}
-
-export function Header({ anno, mese, saldoTotaleMin }: Props) {
+export function Header({ year: anno, month: mese, saldoTotaleMin }: MonthlyDetailHeaderProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -30,7 +25,7 @@ export function Header({ anno, mese, saldoTotaleMin }: Props) {
 
         {/* Logo + datepicker mese */}
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-lg font-semibold text-gray-800 hover:text-gray-600 transition">
+          <Link href="/" className="text-xl font-bold text-gray-800 hover:text-gray-600 transition font-caveat">
             Timbratu
           </Link>
           <input
@@ -43,9 +38,9 @@ export function Header({ anno, mese, saldoTotaleMin }: Props) {
 
         {/* Saldo + utente */}
         <div className="flex items-center gap-4">
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 font-patrick-hand">
             Saldo:{" "}
-            <span className={`font-semibold ${saldoPositivo ? "text-green-600" : "text-red-600"}`}>
+            <span className={`font-semibold font-caveat ${saldoPositivo ? "text-green-600" : "text-red-600"}`}>
               {formatMinuti(saldoTotaleMin)}
             </span>
           </div>

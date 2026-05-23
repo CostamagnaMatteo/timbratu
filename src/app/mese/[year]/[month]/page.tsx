@@ -1,4 +1,4 @@
-import { MesePageClient } from "./MesePageClient";
+import { MesePageClient } from "./monthlyDetail";
 
 export function generateStaticParams() {
   const params = [];
@@ -17,5 +17,5 @@ interface Props {
 
 export default async function MesePage({ params }: Props) {
   const { anno, mese } = await params;
-  return <MesePageClient anno={Number(anno)} mese={Number(mese)} />;
+  return <MesePageClient year={Number(anno)} month={Number(mese)} />;
 }

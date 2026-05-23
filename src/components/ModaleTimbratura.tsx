@@ -1,17 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Timbratura, TipoGiornata, Fascia } from "@/types/timbratura";
+import { Shift, ShiftType, TimeRange, ModaleTimbraturaProps } from "@/types/timbratura";
 import { formatOre } from "@/lib/calcolo-ore";
 
-interface Props {
-  data:        string;
-  iniziale:    Timbratura | null;
-  onSalva:     (t: Timbratura) => void;
-  onChiudi:    () => void;
-}
-
-const TIPI: { valore: TipoGiornata; label: string }[] = [
+const TIPI: { valore: ShiftType; label: string }[] = [
   { valore: "lavoro",   label: "Lavoro"   },
   { valore: "ferie",    label: "Ferie"    },
   { valore: "permesso", label: "Permesso" },
@@ -19,7 +12,7 @@ const TIPI: { valore: TipoGiornata; label: string }[] = [
   { valore: "festivo",  label: "Festivo"  },
 ];
 
-function fasciaVuota(): Fascia {
+function fasciaVuota(): TimeRange {
   return { entrata: "", uscita: "" };
 }
 
@@ -29,7 +22,7 @@ function arrotondaQuarto(ora: string): string {
   return `${String(Math.floor(tot / 60)).padStart(2, "0")}:${String(tot % 60).padStart(2, "0")}`;
 }
 
-function durataFascia(f: Fascia): number | null {
+function durataFascia(f: TimeRange): number | null {
   if (f.entrata.length !== 5 || f.uscita.length !== 5) return null;
   const [hE, mE] = arrotondaQuarto(f.entrata).split(":").map(Number);
   const [hU, mU] = f.uscita.split(":").map(Number);
@@ -72,9 +65,9 @@ function InputOra({ value, onChange }: { value: string; onChange: (v: string) =>
   );
 }
 
-export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
-  const [tipo,   setTipo]   = useState<TipoGiornata>(iniziale?.tipo ?? "lavoro");
-  const [fasce,  setFasce]  = useState<Fascia[]>(iniziale?.fasce?.length ? iniziale.fasce : [fasciaVuota()]);
+export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: ModaleTimbraturaProps) {
+  const [tipo,   setTipo]   = useState<ShiftType>(iniziale?.tipo ?? "lavoro");
+  const [fasce,  setFasce]  = useState<TimeRange[]>(iniziale?.fasce?.length ? iniziale.fasce : [fasciaVuota()]);
   const [note,   setNote]   = useState(iniziale?.note ?? "");
   const [errore, setErrore] = useState<string | null>(null);
 
@@ -84,7 +77,7 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onChiudi]);
 
-  const aggiorniFascia = (i: number, campo: keyof Fascia, valore: string) => {
+  const aggiorniFascia = (i: number, campo: keyof TimeRange, valore: string) => {
     setFasce((prev) => prev.map((f, idx) => idx === i ? { ...f, [campo]: valore } : f));
   };
 
@@ -110,7 +103,7 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
   const handleSalva = () => {
     setErrore(null);
     if (!valida()) return;
-    const t: Timbratura = tipo === "lavoro"
+    const t: Shift = tipo === "lavoro"
       ? { tipo, fasce, ...(note.trim() ? { note: note.trim() } : {}) }
       : { tipo,        ...(note.trim() ? { note: note.trim() } : {}) };
     onSalva(t);
@@ -128,7 +121,7 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
 
         {/* Intestazione */}
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-800">
+          <h2 className="text-lg font-semibold text-gray-800 font-caveat">
             Timbratura — {labelData}
           </h2>
           <button onClick={onChiudi} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
@@ -136,7 +129,7 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
 
         {/* Tipo giornata */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tipo giornata</label>
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide font-patrick-hand">Tipo giornata</label>
           <div className="flex flex-wrap gap-2">
             {TIPI.map(({ valore, label }) => (
               <button
@@ -158,7 +151,7 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
         {/* Fasce orarie (solo per lavoro) */}
         {tipo === "lavoro" && (
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Fasce orarie</label>
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide font-patrick-hand">Fasce orarie</label>
             {fasce.map((f, i) => {
               const durata = durataFascia(f);
               const entrataArr = f.entrata.length === 5 ? arrotondaQuarto(f.entrata) : null;
@@ -174,7 +167,7 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
                   </div>
                   <span className="text-gray-400 text-sm">→</span>
                   <InputOra value={f.uscita} onChange={(v) => aggiorniFascia(i, "uscita", v)} />
-                  <span className="w-20 text-xs font-mono text-right">
+                  <span className="w-20 text-sm text-right font-caveat">
                     {durata !== null
                       ? <span className="text-blue-600 font-medium">{formatOre(durata)}</span>
                       : <span className="text-gray-300">—</span>
@@ -204,7 +197,7 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
 
         {/* Note */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Note (opzionale)</label>
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide font-patrick-hand">Note (opzionale)</label>
           <input
             type="text"
             value={note}
@@ -229,7 +222,7 @@ export function ModaleTimbratura({ data, iniziale, onSalva, onChiudi }: Props) {
           </button>
           <button
             onClick={handleSalva}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition"
+            className="px-4 py-2 rounded-lg text-base font-medium bg-blue-600 text-white hover:bg-blue-700 transition font-caveat"
           >
             Salva
           </button>

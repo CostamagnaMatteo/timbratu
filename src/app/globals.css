@@ -12,6 +12,14 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@utility font-caveat {
+  font-family: var(--font-caveat);
+}
+
+@utility font-patrick-hand {
+  font-family: var(--font-patrick-hand);
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;

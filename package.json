@@ -7,7 +7,8 @@
     "dev:local": "concurrently --kill-others --names \"emulators,next\" --prefix-colors \"yellow,cyan\" \"firebase emulators:start --only auth,firestore\" \"wait-on http://localhost:9099 && next dev\"",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "issues:sync": "bash scripts/sync-issues.sh"
   },
   "dependencies": {
     "firebase": "^12.13.0",

@@ -1,23 +1,16 @@
 "use client";
 
-import { Timbratura } from "@/types/timbratura";
+import { TabellaMessileProps } from "@/types/timbratura";
 import { calcolaGiorno, formatMinuti, formatOre } from "@/lib/calcolo-ore";
 import { nomeGiorno, isWeekend, isFuturo } from "@/lib/date-utils";
 import { BadgeTipo } from "@/components/BadgeTipo";
 
-interface Props {
-  giorni:      string[];
-  timbrature:  Record<string, Timbratura>;
-  onEdit:      (data: string) => void;
-  onDelete:    (data: string) => void;
-}
-
-export function TabellaMessile({ giorni, timbrature, onEdit, onDelete }: Props) {
+export function TabellaMessile({ giorni, timbrature, onEdit, onDelete }: TabellaMessileProps) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead>
-          <tr className="text-xs text-gray-500 uppercase border-b border-gray-200">
+          <tr className="text-xs text-gray-500 uppercase border-b border-gray-200 font-patrick-hand">
             <th className="py-3 px-4 text-left font-medium">Giorno</th>
             <th className="py-3 px-4 text-left font-medium">Tipo</th>
             <th className="py-3 px-4 text-left font-medium">Entrata</th>
@@ -72,7 +65,7 @@ export function TabellaMessile({ giorni, timbrature, onEdit, onDelete }: Props) 
                     <span className="text-gray-200">—</span>
                   )}
                 </td>
-                <td className="py-3 px-4 text-gray-700">
+                <td className="py-3 px-4 text-gray-700 font-caveat">
                   {calc ? formatOre(calc.oreNetteMin) : <span className="text-gray-300">—</span>}
                 </td>
                 <td className="py-3 px-4 text-center">
@@ -82,7 +75,7 @@ export function TabellaMessile({ giorni, timbrature, onEdit, onDelete }: Props) 
                     <span className="text-gray-200">—</span>
                   )}
                 </td>
-                <td className="py-3 px-4 font-medium">
+                <td className="py-3 px-4 font-medium font-caveat">
                   {calc ? (
                     <span className={calc.saldoMin >= 0 ? "text-green-600" : "text-red-600"}>
                       {formatMinuti(calc.saldoMin)}

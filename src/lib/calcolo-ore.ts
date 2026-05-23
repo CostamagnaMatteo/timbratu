@@ -1,4 +1,4 @@
-import { Fascia, Timbratura, CalcoloGiorno, CalcoloMese } from "@/types/timbratura";
+import { TimeRange, Shift, CalcoloGiorno, CalcoloMese } from "@/types/timbratura";
 
 const ORARIO_CONTRATTUALE_MIN = 432; // 7h 12min
 const SOGLIA_PAUSA_MIN        = 480; // 8h
@@ -15,7 +15,7 @@ function diffMinuti(entrata: string, uscita: string): number {
   return (hU * 60 + mU) - arrotondaEntrataQuarto(entrata);
 }
 
-export function calcolaGiorno(fasce: Fascia[]): CalcoloGiorno {
+export function calcolaGiorno(fasce: TimeRange[]): CalcoloGiorno {
   const oreTotaliMin = fasce.reduce((acc, f) => acc + diffMinuti(f.entrata, f.uscita), 0);
   const pausaApplicata = fasce.length === 1 && oreTotaliMin > SOGLIA_PAUSA_MIN;
   const oreNetteMin    = pausaApplicata ? oreTotaliMin - DEDUZIONE_PAUSA_MIN : oreTotaliMin;
@@ -23,7 +23,7 @@ export function calcolaGiorno(fasce: Fascia[]): CalcoloGiorno {
   return { oreTotaliMin, oreNetteMin, pausaApplicata, saldoMin };
 }
 
-export function calcolaMese(timbrature: Record<string, Timbratura>): CalcoloMese {
+export function calcolaMese(timbrature: Record<string, Shift>): CalcoloMese {
   let saldoTotaleMin   = 0;
   let giorniLavorativi = 0;
 

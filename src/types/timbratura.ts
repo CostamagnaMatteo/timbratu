@@ -1,15 +1,4 @@
-export type TipoGiornata = "lavoro" | "ferie" | "permesso" | "malattia" | "festivo";
-
-export interface Fascia {
-  entrata: string;
-  uscita:  string;
-}
-
-export interface Timbratura {
-  fasce?: Fascia[];
-  tipo:   TipoGiornata;
-  note?:  string;
-}
+import { Shift } from "./shift";
 
 export interface CalcoloGiorno {
   oreTotaliMin:   number;
@@ -27,4 +16,24 @@ export interface AggregazioneMese {
   saldoTotaleMin:   number;
   giorniLavorativi: number;
   aggregatoIl:      string; // YYYY-MM-DD
+}
+
+export interface MonthlyDetailHeaderProps {
+  year:           number;
+  month:           number;
+  saldoTotaleMin: number;
+}
+
+export interface TabellaMessileProps {
+  giorni:     string[];
+  timbrature: Record<string, Shift>;
+  onEdit:     (data: string) => void;
+  onDelete:   (data: string) => void;
+}
+
+export interface ModaleTimbraturaProps {
+  data:     string;
+  iniziale: Shift | null;
+  onSalva:  (t: Shift) => void;
+  onChiudi: () => void;
 }
