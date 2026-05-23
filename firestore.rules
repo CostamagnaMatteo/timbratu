@@ -4,5 +4,8 @@ service cloud.firestore {
     match /users/{userId}/timbrature/{doc} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+    match /users/{userId}/aggregazioni/{doc} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }
